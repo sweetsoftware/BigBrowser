@@ -62,7 +62,7 @@ def generate_report(urls, nb_threads=5, report_name="report.html"):
     <html>
     <head>
     </head>
-    <body>
+    <body style="background: black">
     <table>
     '''
     )
@@ -71,7 +71,7 @@ def generate_report(urls, nb_threads=5, report_name="report.html"):
         sc_file = "pics/" + '_'.join(url.split('://')[::-1]) + ".png"
         if col == 0:
             html_file.write('<tr>')
-        html_file.write('<td style="text-align:center"><div style="height:600px;overflow:hidden"><a href="' + sc_file + '"><img style="height:60%;width:80%" src="' + sc_file + '"/></a><strong><a href="'+ url + '">' + url + '</a></strong></div></td>')
+        html_file.write('<td style="text-align:center"><div style="height:600px;overflow:hidden"><a href="' + sc_file + '"><img style="height:60%;width:80%;background:white;" src="' + sc_file + '"/></a><strong><a href="'+ url + '" style="color: white">' + url + '</a></strong></div></td>')
         if col == 3:
             html_file.write('</tr>')
         col = (col + 1) % 4
@@ -90,7 +90,7 @@ def generate_report(urls, nb_threads=5, report_name="report.html"):
         thread.start()
     for thread in threads:
         thread.join()
-    print "[*] Report generated: " + os.path.join(os.getcwd(), report_name)
+    print "[*] Report generated: file://" + os.path.join(os.getcwd(), report_name)
 
 def main():
     parser = argparse.ArgumentParser(description="Generates a HTML report with screenshots of all targeted web servers. Input can be either a text file with one URL per line, or nmap XML output")
