@@ -8,11 +8,16 @@ import argparse
 from xml.dom import minidom
 from selenium import webdriver
 
+
+PROGRESS = 0
+
+
 def read_url_list(filename):
     url_file = open("urls.txt", "r")
     urls =  [ url.rstrip('\n') for url in url_file.readlines() ]
     url_file.close()
     return urls
+
 
 def extract_nmap_xml(filename):
     url_file = open("urls.txt", 'w')
@@ -40,7 +45,9 @@ def extract_nmap_xml(filename):
                 url_file.write(url + "\n")
     url_file.close()
 
-def take_screenshots(url_set):
+
+def take_screenshots(url_set, nb_threads):
+    global PROGRESS
     driver = webdriver.PhantomJS(service_args=['--ignore-ssl-errors=true', '--ssl-protocol=any'])
     driver.set_window_size(800, 600)
     for url in url_set:
@@ -48,10 +55,12 @@ def take_screenshots(url_set):
             driver.get(url)
             sc_file = 'pics/' + '_'.join(url.split('://')[::-1]) + ".png"
             driver.save_screenshot(sc_file)
-            print "[*] Downloading: " + url + " > " + sc_file
+            PROGRESS +=  100.0 / len(url_set) / nb_threads
+            print "[" + str(int(PROGRESS)) + "%] Downloading: " + url + " > " + sc_file
         except Exception as exc:
             print exc
     driver.quit()
+
 
 def generate_report(urls, nb_threads=5, report_name="report.html"):
     if not os.path.exists("pics/"):
@@ -85,12 +94,13 @@ def generate_report(urls, nb_threads=5, report_name="report.html"):
     thread_load = len(urls) / nb_threads
     threads = []
     for i in range(nb_threads):
-        threads.append(threading.Thread(target=take_screenshots, args=(urls[i * thread_load:(i + 1) * thread_load ],)))
+        threads.append(threading.Thread(target=take_screenshots, args=(urls[i * thread_load:(i + 1) * thread_load ], nb_threads)))
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
     print "[*] Report generated: file://" + os.path.join(os.getcwd(), report_name)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Generates a HTML report with screenshots of all targeted web servers. Input can be either a text file with one URL per line, or nmap XML output")
@@ -120,9 +130,10 @@ def main():
     os.makedirs(report_name)
     os.chdir(report_name)
     if args.threads:
-        generate_report(urls, int(args.threads), report_name=report_name + ".html")
+        nb_threads = int(args.threads)
     else:
-        generate_report(urls, report_name=report_name + ".html")
+        nb_threads = 5
+    generate_report(urls, nb_threads, report_name=report_name + ".html")
 
 if __name__ == "__main__":
     main()
