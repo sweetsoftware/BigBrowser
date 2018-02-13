@@ -26,6 +26,8 @@ def extract_nmap_xml(filename):
 
     for host in soup.find_all('host'):
         ip_addr = host.address["addr"]
+        if not host.ports:
+            continue
         for port in host.ports.find_all('port'):
             if port.state["state"] == "open":
                 if port.service["name"] in ["http", "https"]:
@@ -70,8 +72,8 @@ def generate_report(urls, nb_threads=5, report_name="report.html"):
         sc_file = 'pics/' + url.split('://')[1] + ".png"
         if col == 0:
             html_file.write('<tr>')
-        html_file.write('<td style="text-align:center"><div style="height:600px;overflow:hidden"><a href="' \
-            + sc_file + '"><img style="height:60%;width:80%;background:white;" src="' + sc_file + \
+        html_file.write('<td style="text-align:center"><div style="height:600px;overflow:hidden"><a target="_blank" href="' \
+            + url + '"><img style="height:60%;width:80%;background:white;" src="' + sc_file + \
             '"/></a><strong><a target="_blank" href="'+ url + '" style="color: white">' + url + '</a></strong></div></td>')
         if col == 3:
             html_file.write('</tr>')
@@ -118,6 +120,10 @@ def main():
         urls =extract_nmap_xml(args.file)
     else:
         urls = read_url_list(args.file)
+    
+    print "Found Web applications:"
+    for url in urls:
+        print url
 
     report_name = "bigbrowser_report"
     if args.output:
