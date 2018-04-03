@@ -4,9 +4,8 @@ import sys
 import os
 import threading
 import argparse
-import datetime
+import shutil
 
-from selenium import webdriver
 from bs4 import BeautifulSoup
 
 PROGRESS = 0
@@ -31,7 +30,7 @@ def extract_nmap_xml(filename):
         for port in host.ports.find_all('port'):
             if port.state["state"] == "open":
                 if port.service["name"] in ["http", "https"]:
-                    if port.service.has_attr('tunnel') and port.service["tunnel"] == "ssl":
+                    if port.service.has_attr('tunnel') and port.service["tunnel"] == "ssl" or port["portid"] == "443":
                         url = "https://"
                     else:
                         url = "http://"
@@ -42,18 +41,14 @@ def extract_nmap_xml(filename):
 
 def take_screenshots(url_set, nb_threads):
     global PROGRESS
-    driver = webdriver.PhantomJS(service_args=['--ignore-ssl-errors=true', '--ssl-protocol=any'])
-    driver.set_window_size(800, 600)
     for url in url_set:
         try:
-            driver.get(url)
             sc_file = 'pics/' + url.split('://')[1] + ".png"
-            driver.save_screenshot(sc_file)
-            PROGRESS +=  100.0 / len(url_set) / nb_threads
-            print "[" + str(int(PROGRESS)) + "%] Downloading: " + url + " > " + sc_file
+            os.system('phantomjs --ssl-protocol=any --ignore-ssl-errors=true ../sc.js %s %s >/dev/null 2>&1' % (url, sc_file))
+            PROGRESS += 1
+            print "[" + str(PROGRESS) + "/" + str(len(url_set) * nb_threads)  + "] Downloading: " + url + " > " + sc_file
         except Exception as exc:
             print exc
-    driver.quit()
 
 
 def generate_report(urls, nb_threads=5, report_name="report.html"):
@@ -72,7 +67,7 @@ def generate_report(urls, nb_threads=5, report_name="report.html"):
         sc_file = 'pics/' + url.split('://')[1] + ".png"
         if col == 0:
             html_file.write('<tr>')
-        html_file.write('<td style="text-align:center"><div style="height:600px;overflow:hidden"><a target="_blank" href="' \
+        html_file.write('<td style="text-align:center"><div style="overflow:hidden"><a target="_blank" href="' \
             + url + '"><img style="height:60%;width:80%;background:white;" src="' + sc_file + \
             '"/></a><strong><a target="_blank" href="'+ url + '" style="color: white">' + url + '</a></strong></div></td>')
         if col == 3:
@@ -129,8 +124,10 @@ def main():
     if args.output:
         report_name = args.output
     if os.path.exists(report_name):
-        print "Folder exists: %s" % report_name
-        exit(0)
+        if raw_input("Folder exists (" + report_name + ") overwrite ?(y/n)") == "y":
+            shutil.rmtree(report_name)
+        else:
+            exit(1)
     os.makedirs(report_name)
     os.chdir(report_name)
     
