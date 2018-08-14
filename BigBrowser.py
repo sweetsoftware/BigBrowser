@@ -8,7 +8,9 @@ import shutil
 
 from bs4 import BeautifulSoup
 
+
 PROGRESS = 0
+VERBOSE = False
 
 
 def read_url_list(filename):
@@ -22,19 +24,23 @@ def extract_nmap_xml(filename):
     xml_file = open(filename, 'r')
     soup = BeautifulSoup(xml_file, 'lxml')
     urls = []
-
     for host in soup.find_all('host'):
-        ip_addr = host.address["addr"]
+        hostname = host.address["addr"]
+        hnames = host.find_all('hostname')
+        if hnames:
+            hostname = hnames[0]["name"]
+            if hostname[len(hostname)-1] == ".":
+                hostname = hostname[:len(hostname)-1]
         if not host.ports:
             continue
         for port in host.ports.find_all('port'):
-            if port.state["state"] == "open":
-                if port.service["name"] in ["http", "https"]:
-                    if port.service.has_attr('tunnel') and port.service["tunnel"] == "ssl" or port["portid"] == "443":
+            if "http" in port.service["name"]:
+                if port.state["state"] == "open":
+                    if port.service.has_attr('tunnel') and port.service["tunnel"] == "ssl" or "https" in port.service["name"]:
                         url = "https://"
                     else:
                         url = "http://"
-                    url += ip_addr + ":" + port["portid"]
+                    url += hostname + ":" + port["portid"]
                     urls.append(url)
     return urls
 
@@ -43,8 +49,13 @@ def take_screenshots(url_set, nb_threads):
     global PROGRESS
     for url in url_set:
         try:
-            sc_file = 'pics/' + url.split('://')[1] + ".png"
-            os.system('phantomjs --ssl-protocol=any --ignore-ssl-errors=true ../sc.js %s %s >/dev/null 2>&1' % (url, sc_file))
+            hostname = url.split("://")[1].split(":")[0]
+            port = url.split("://")[1].split(":")[1]
+            sc_file = 'pics/' + hostname + "-" + port + ".png"
+            cmd = 'phantomjs --ssl-protocol=any --ignore-ssl-errors=true ../sc.js %s %s >/dev/null 2>&1' % (url, sc_file)
+            if VERBOSE:
+                print cmd
+            os.system(cmd)
             PROGRESS += 1
             print "[" + str(PROGRESS) + "/" + str(len(url_set) * nb_threads)  + "] Downloading: " + url + " > " + sc_file
         except Exception as exc:
@@ -64,7 +75,9 @@ def generate_report(urls, nb_threads=5, report_name="report.html"):
     )
     col = 0
     for url in urls:
-        sc_file = 'pics/' + url.split('://')[1] + ".png"
+        hostname = url.split("://")[1].split(":")[0]
+        port = url.split("://")[1].split(":")[1]
+        sc_file = 'pics/' + hostname + "-" + port + ".png"
         if col == 0:
             html_file.write('<tr>')
         html_file.write('<td style="text-align:center"><div style="overflow:hidden"><a target="_blank" href="' \
@@ -87,10 +100,12 @@ def generate_report(urls, nb_threads=5, report_name="report.html"):
             threads.append(threading.Thread(target=take_screenshots, args=(urls[i * thread_load:], nb_threads)))
         else:
             threads.append(threading.Thread(target=take_screenshots, args=(urls[i * thread_load:(i + 1) * thread_load ], nb_threads)))
+
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
+
     print "[*] Report generated: file://" + os.path.join(os.getcwd(), report_name)
 
 
@@ -99,7 +114,11 @@ def main():
     parser.add_argument("file", help="Nmap XML output or text file with one URL per line")
     parser.add_argument("-t", "--threads", help="Number of threads")
     parser.add_argument("-o", "--output", help="Name of the generated report")
+    parser.add_argument("-v", "--verbose", help="Verbose output", action='store_true')
     args = parser.parse_args()
+
+    global VERBOSE
+    VERBOSE = args.verbose
 
     if not os.path.exists(args.file):
         print "File not found: " + args.file
@@ -117,9 +136,9 @@ def main():
         urls = read_url_list(args.file)
     
     print "Found Web applications:"
+    print "=" * 50
     for url in urls:
         print url
-
     report_name = "bigbrowser_report"
     if args.output:
         report_name = args.output
