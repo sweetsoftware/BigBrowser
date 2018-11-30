@@ -5,19 +5,13 @@ import os
 import threading
 import argparse
 import shutil
+import subprocess
 
 from bs4 import BeautifulSoup
 
 
 PROGRESS = 0
-VERBOSE = False
-
-
-def read_url_list(filename):
-    url_file = open("urls.txt", "r")
-    urls =  [ url.rstrip('\n') for url in url_file.readlines() ]
-    url_file.close()
-    return urls
+TOTAL = 0
 
 
 def extract_nmap_xml(filename):
@@ -34,8 +28,8 @@ def extract_nmap_xml(filename):
         if not host.ports:
             continue
         for port in host.ports.find_all('port'):
-            if "http" in port.service["name"]:
-                if port.state["state"] == "open":
+            if port.state["state"] == "open":
+                if "http" in port.service["name"]:
                     if port.service.has_attr('tunnel') and port.service["tunnel"] == "ssl" or "https" in port.service["name"]:
                         url = "https://"
                     else:
@@ -52,14 +46,13 @@ def take_screenshots(url_set, nb_threads):
             hostname = url.split("://")[1].split(":")[0]
             port = url.split("://")[1].split(":")[1]
             sc_file = 'pics/' + hostname + "-" + port + ".png"
-            cmd = 'phantomjs --ssl-protocol=any --ignore-ssl-errors=true ../sc.js %s %s >/dev/null 2>&1' % (url, sc_file)
-            if VERBOSE:
-                print cmd
-            os.system(cmd)
             PROGRESS += 1
-            print "[" + str(PROGRESS) + "/" + str(len(url_set) * nb_threads)  + "] Downloading: " + url + " > " + sc_file
+            print "[" + str(PROGRESS) + "/" + str(TOTAL)  + "] Downloading: " + url + " > " + sc_file
+            devnull = open(os.devnull, 'w')
+            subprocess.call(['phantomjs', '--ssl-protocol=any', '--ignore-ssl-errors=true', '../sc.js', url, sc_file], stdout=devnull, stderr=devnull)
+            devnull.close()
         except Exception as exc:
-            print exc
+            print "Screenshot exception : " + str(exc)
 
 
 def generate_report(urls, nb_threads=5, report_name="report.html"):
@@ -110,35 +103,36 @@ def generate_report(urls, nb_threads=5, report_name="report.html"):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generates a HTML report with screenshots of all found web servers. Input can be either a text file with one URL per line, or nmap XML output")
-    parser.add_argument("file", help="Nmap XML output or text file with one URL per line")
+    parser = argparse.ArgumentParser(description="Generates an HTML report with screenshots of all Web applications from an XML nmap scan.")
+    parser.add_argument("file", help="Nmap XML output")
     parser.add_argument("-t", "--threads", help="Number of threads")
     parser.add_argument("-o", "--output", help="Name of the generated report")
-    parser.add_argument("-v", "--verbose", help="Verbose output", action='store_true')
     args = parser.parse_args()
 
-    global VERBOSE
-    VERBOSE = args.verbose
-
+    # Open nmap file and extract Web applications URLs
     if not os.path.exists(args.file):
         print "File not found: " + args.file
         exit(0)
 
-    filetype="txt"
     with open(args.file, "r") as f:
         for line in f:
             if "<!DOCTYPE nmaprun>" in line:
-                filetype = "nmap"
-    urls = None
-    if filetype == "nmap":
-        urls =extract_nmap_xml(args.file)
-    else:
-        urls = read_url_list(args.file)
+                break
+        else:
+            print "Not a valid nmap XML"
+            exit(1)
+
+    urls = extract_nmap_xml(args.file)
     
-    print "Found Web applications:"
+    print "Web applications: "
     print "=" * 50
     for url in urls:
         print url
+    print "=" * 50
+    global TOTAL
+    TOTAL = len(urls)
+
+    # Generate the report
     report_name = "bigbrowser_report"
     if args.output:
         report_name = args.output
@@ -153,9 +147,11 @@ def main():
     if args.threads:
         nb_threads = int(args.threads)
     else:
-        nb_threads = 5
+        nb_threads = 4
+
     generate_report(urls, nb_threads, report_name=report_name + ".html")
 
 
 if __name__ == "__main__":
     main()
+
