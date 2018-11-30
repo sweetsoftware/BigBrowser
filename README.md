@@ -1,8 +1,8 @@
 # BigBrowser
 
-usage: BigBrowser.py [-h] [-t THREADS] [-o OUTPUT] file
+Generates an HTML report with screenshots of all Web applications from a nmap XML file. 
 
-Generates an HTML report with screenshots of all Web servers from a nmap XML file or url list file. 
+usage: BigBrowser.py [-h] [-t THREADS] [-o OUTPUT] file
 
 ## Setup
 
