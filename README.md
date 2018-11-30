@@ -4,6 +4,27 @@ usage: BigBrowser.py [-h] [-t THREADS] [-o OUTPUT] file
 
 Generates an HTML report with screenshots of all Web servers from a nmap XML file or url list file. 
 
+## Setup
+
+Requirements:
+
+* beautyfulsoup
+* phantomjs
+
+Setup on Kali:
+
+```
+apt install phantomjs
+pip install -r requirements.txt
+```
+
+Running on a headless server:
+
+```
+apt install xvfb
+xvfb-run ./Bigbrowser.py scan.xml
+```
+
 ## Example
 
 ```
