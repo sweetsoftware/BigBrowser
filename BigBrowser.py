@@ -29,13 +29,15 @@ def extract_nmap_xml(filename):
             continue
         for port in host.ports.find_all('port'):
             if port.state["state"] == "open":
-                if "http" in port.service["name"]:
-                    if port.service.has_attr('tunnel') and port.service["tunnel"] == "ssl" or "https" in port.service["name"]:
+                service = port.find("service")
+                if service and "http" in service["name"]:
+                    if port.service.has_attr('tunnel') and service["tunnel"] == "ssl" or "https" in service["name"]:
                         url = "https://"
                     else:
                         url = "http://"
                     url += hostname + ":" + port["portid"]
                     urls.append(url)
+                    print "Adding " + url
     return urls
 
 
